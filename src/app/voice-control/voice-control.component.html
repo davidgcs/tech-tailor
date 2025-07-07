@@ -1,0 +1,6 @@
+ <div class="voice-container">
+    <canvas #voiceCanvas></canvas>
+    <button [disabled]="isProcessing$ | async" (click)="toggleRecording()" aria-label="Record">
+        {{ (isRecording$ | async) ? buttonText.START : buttonText.STOP }}
+    </button>
+</div>

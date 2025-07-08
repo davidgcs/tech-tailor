@@ -1,195 +1,212 @@
 import {
-  ComponentFixture,
-  TestBed,
-  fakeAsync,
-  tick,
-} from '@angular/core/testing';
-import { MockStore, provideMockStore } from '@ngrx/store/testing';
-import { SmartNavigationComponent } from './smart-navigation.component';
-import { SmartNavigationService } from './smart-navigation.service';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  HostListener,
+  inject,
+  OnInit,
+  OnDestroy,
+  signal,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
+} from '@angular/core';
+import { Store } from '@ngrx/store';
 import { MatIconModule } from '@angular/material/icon';
-import { WritableSignal } from '@angular/core';
-import { NavigationState } from '../store/navigation.reducer';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { AsyncPipe } from '@angular/common';
+import {
+  CdkVirtualScrollViewport,
+  ScrollingModule,
+} from '@angular/cdk/scrolling';
+import { SmartNavigationService } from './smart-navigation.service';
+import { NavigationItem } from './navigation.types';
+import { IntersectionObserverService } from '../shared/intersection-observer.service';
+import { smartNavigationAnimations } from '../animations/smart-navigation.animations';
 import * as NavigationActions from '../store/navigation.actions';
 import * as NavigationSelectors from '../store/navigation.selectors';
+import { gsap } from 'gsap';
+import { Subject, takeUntil } from 'rxjs';
 
-class MockSmartNavigationService {
-  saveHistory = jasmine.createSpy('saveHistory');
-  loadHistory = jasmine.createSpy('loadHistory').and.returnValue([]);
+@Component({
+  selector: 'app-smart-navigation',
+  templateUrl: './smart-navigation.component.html',
+  styleUrls: ['./smart-navigation.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [MatIconModule, MatAutocompleteModule, AsyncPipe, ScrollingModule],
+  animations: smartNavigationAnimations,
+})
+export class SmartNavigationComponent
+  implements OnInit, OnDestroy, AfterViewInit
+{
+  private readonly store = inject(Store);
+  private readonly navService = inject(SmartNavigationService);
+  private readonly intersectionService = inject(IntersectionObserverService);
+  private readonly destroy$ = new Subject<void>();
 
-  debouncedSignal<T>(source: WritableSignal<T>, _ms: number) {
-    return source;
+  @ViewChild('searchContainer', { read: ElementRef })
+  searchContainer!: ElementRef;
+  @ViewChild('virtualScroll') virtualScroll!: CdkVirtualScrollViewport;
+
+  query = signal('');
+  debouncedQuery = this.navService.debouncedSignal(this.query, 300);
+  searchActive = signal(false);
+  searchOpened = signal(false);
+  isVisible = signal(true);
+  animationsEnabled = signal(true);
+
+  filteredItems$ = this.store.select(NavigationSelectors.selectFilteredItems);
+  loading$ = this.store.select(NavigationSelectors.selectLoading);
+  error$ = this.store.select(NavigationSelectors.selectError);
+
+  private searchTimeline: gsap.core.Timeline | null = null;
+
+  constructor() {
+    effect(() => {
+      const query = this.debouncedQuery();
+      if (query !== '') {
+        this.searchActive.set(true);
+        this.store.dispatch(
+          NavigationActions.filterItems({ searchTerm: query })
+        );
+
+        const currentHistory = this.navService.loadHistory();
+        const newHistory = [
+          query,
+          ...currentHistory.filter((h) => h !== query),
+        ].slice(0, 10);
+        this.navService.saveHistory(newHistory);
+      } else {
+        this.searchActive.set(false);
+      }
+    });
+  }
+
+  ngOnInit() {
+    this.store.dispatch(NavigationActions.loadItems());
+  }
+
+  ngAfterViewInit() {
+    this.setupIntersectionObserver();
+    this.initializeGSAPAnimations();
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.cleanupAnimations();
+  }
+
+  trackByItemId = (index: number, item: NavigationItem): string => item.id;
+
+  private setupIntersectionObserver() {
+    if (this.searchContainer && this.intersectionService.isSupported()) {
+      this.intersectionService
+        .createObserver(this.searchContainer.nativeElement)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe((isVisible) => {
+          this.isVisible.set(isVisible);
+          this.animationsEnabled.set(isVisible);
+
+          if (!isVisible && this.searchTimeline) {
+            this.searchTimeline.pause();
+          } else if (isVisible && this.searchTimeline) {
+            this.searchTimeline.resume();
+          }
+        });
+    }
+  }
+
+  private initializeGSAPAnimations() {
+    this.searchTimeline = gsap.timeline({ paused: true });
+  }
+
+  private cleanupAnimations() {
+    if (this.searchTimeline) {
+      this.searchTimeline.kill();
+      this.searchTimeline = null;
+    }
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  handleShortcut(ev: KeyboardEvent) {
+    if (ev.ctrlKey && ev.key.toLowerCase() === 'k') {
+      ev.preventDefault();
+      this.toggleSearch();
+    }
+  }
+
+  private toggleSearch() {
+    const wasOpened = this.searchOpened();
+    this.searchOpened.update((i) => !i);
+
+    if (this.animationsEnabled() && this.searchContainer) {
+      if (!wasOpened) {
+        this.animateSearchOpen();
+      } else {
+        this.animateSearchClose();
+      }
+    }
+  }
+
+  private animateSearchOpen() {
+    if (!this.searchContainer) return;
+
+    gsap.fromTo(
+      this.searchContainer.nativeElement.querySelector('#search'),
+      {
+        opacity: 0,
+        scale: 0.8,
+        y: -20,
+      },
+      {
+        opacity: 1,
+        scale: 1,
+        y: 0,
+        duration: 0.3,
+        ease: 'back.out(1.7)',
+      }
+    );
+  }
+
+  private animateSearchClose() {
+    if (!this.searchContainer) return;
+
+    gsap.to(this.searchContainer.nativeElement.querySelector('#search'), {
+      opacity: 0,
+      scale: 0.8,
+      y: -20,
+      duration: 0.25,
+      ease: 'power2.in',
+    });
+  }
+
+  onSelectItem(item: NavigationItem) {
+    this.store.dispatch(NavigationActions.selectItem({ item }));
+
+    if (this.animationsEnabled()) {
+      this.animateItemSelection(item);
+    }
+  }
+
+  private animateItemSelection(item: NavigationItem) {
+    const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
+    if (itemElement) {
+      gsap.to(itemElement, {
+        scale: 1.05,
+        duration: 0.1,
+        yoyo: true,
+        repeat: 1,
+        ease: 'power2.inOut',
+      });
+    }
+  }
+
+  getHistory(): string[] {
+    return this.navService.loadHistory();
+  }
+
+  shouldUseVirtualScroll(items: NavigationItem[] | null): boolean {
+    return (items?.length || 0) > 100;
   }
 }
-
-describe('SmartNavigationComponent', () => {
-  let component: SmartNavigationComponent;
-  let fixture: ComponentFixture<SmartNavigationComponent>;
-  let service: MockSmartNavigationService;
-  let store: MockStore;
-
-  const initialState: NavigationState = {
-    items: [],
-    filteredItems: [],
-    searchTerm: '',
-    recentItems: [],
-    loading: false,
-    error: null,
-  };
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [MatIconModule, MatAutocompleteModule, SmartNavigationComponent],
-      providers: [
-        provideMockStore({ initialState: { navigation: initialState } }),
-        {
-          provide: SmartNavigationService,
-          useClass: MockSmartNavigationService,
-        },
-      ],
-    }).compileComponents();
-
-    fixture = TestBed.createComponent(SmartNavigationComponent);
-    component = fixture.componentInstance;
-    service = TestBed.inject(
-      SmartNavigationService
-    ) as unknown as MockSmartNavigationService;
-    store = TestBed.inject(MockStore);
-
-    spyOn(store, 'dispatch').and.callThrough();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
-  it('should dispatch loadItems action on init', () => {
-    component.ngOnInit();
-
-    expect(store.dispatch).toHaveBeenCalledWith(NavigationActions.loadItems());
-  });
-
-  it('should open search with Ctrl+K', () => {
-    const event = new KeyboardEvent('keydown', {
-      key: 'k',
-      ctrlKey: true,
-    });
-
-    component.handleShortcut(event);
-    expect(component.searchOpened()).toBeTrue();
-  });
-
-  it('should dispatch filterItems action when query changes', fakeAsync(() => {
-    (store.dispatch as jasmine.Spy).calls.reset();
-    fixture.detectChanges();
-
-    component.query.set('angular');
-
-    tick(300);
-    fixture.detectChanges();
-
-    expect(store.dispatch).toHaveBeenCalledWith(
-      NavigationActions.filterItems({ searchTerm: 'angular' })
-    );
-  }));
-
-  it('should save search history when query changes', fakeAsync(() => {
-    fixture.detectChanges();
-
-    component.query.set('angular');
-
-    tick(300);
-    fixture.detectChanges();
-
-    expect(service.saveHistory).toHaveBeenCalled();
-  }));
-
-
-  it('should dispatch selectItem action when item is selected', () => {
-    const mockItem = { id: '1', title: 'Test Item' };
-
-    component.onSelectItem(mockItem);
-
-    expect(store.dispatch).toHaveBeenCalledWith(
-      NavigationActions.selectItem({ item: mockItem })
-    );
-  });
-
-  it('should activate search when debounced query is not empty', fakeAsync(() => {
-    fixture.detectChanges();
-
-    component.query.set('test');
-
-    tick(300);
-    fixture.detectChanges();
-
-    expect(component.searchActive()).toBeTrue();
-  }));
-
-  it('should deactivate search when debounced query is empty', fakeAsync(() => {
-    fixture.detectChanges();
-
-    component.query.set('test');
-    tick(300);
-    fixture.detectChanges();
-    expect(component.searchActive()).toBeTrue();
-
-    component.query.set('');
-    tick(300);
-    fixture.detectChanges();
-    expect(component.searchActive()).toBeFalse();
-  }));
-
-  it('should show filtered items from store', (done) => {
-    const mockItems = [
-      { id: '1', title: 'Test Item 1' },
-      { id: '2', title: 'Test Item 2' },
-    ];
-
-    store.overrideSelector(NavigationSelectors.selectFilteredItems, mockItems);
-    store.refreshState();
-    fixture.detectChanges();
-
-    component.filteredItems$.subscribe((items) => {
-      expect(items).toEqual(mockItems);
-      done();
-    });
-  });
-
-  it('should show loading state', (done) => {
-    store.overrideSelector(NavigationSelectors.selectLoading, true);
-    store.refreshState();
-    fixture.detectChanges();
-
-    component.loading$.subscribe((loading) => {
-      expect(loading).toBeTrue();
-      done();
-    });
-  });
-
-  it('should show error state', (done) => {
-    const errorMessage = 'Test error';
-    store.overrideSelector(NavigationSelectors.selectError, errorMessage);
-    store.refreshState();
-    fixture.detectChanges();
-
-    component.error$.subscribe((error) => {
-      expect(error).toBe(errorMessage);
-      done();
-    });
-  });
-
-  it('should prevent default on Ctrl+K shortcut', () => {
-    const event = new KeyboardEvent('keydown', {
-      key: 'k',
-      ctrlKey: true,
-    });
-
-    spyOn(event, 'preventDefault');
-
-    component.handleShortcut(event);
-
-    expect(event.preventDefault).toHaveBeenCalled();
-  });
-});

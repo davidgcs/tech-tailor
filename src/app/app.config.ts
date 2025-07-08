@@ -10,12 +10,14 @@ import { provideStore } from '@ngrx/store';
 import { provideEffects } from '@ngrx/effects';
 import { navigationReducer } from './store/navigation.reducer';
 import { NavigationEffects } from './store/navigation.effects';
+import { provideAnimations } from '@angular/platform-browser/animations';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideClientHydration(withEventReplay()),
+    provideAnimations(),
     provideStore({ navigation: navigationReducer }),
     provideEffects([NavigationEffects]),
   ],

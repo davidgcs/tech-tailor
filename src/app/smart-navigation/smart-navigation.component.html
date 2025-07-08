@@ -1,39 +1,56 @@
 @if (searchOpened()) {
-  @if (getHistory().length > 0) {
-    <p class="history">Search history (latest 10 entries): {{getHistory().join(', ')}}</p>
-  } @else {
-    <p class="history">Search history empty</p>
-  }
-  <div id="search-container">
-    <div id="search">
-      <mat-icon aria-hidden="false" aria-label="search icon" fontIcon="search"></mat-icon>
-      <input type="text" [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Search...">
-    </div>
-    @if(searchActive()){
-      <div id="search-results">
-        @if(loading$ | async) {
-          <div class="search-result">
-            <span>Loading...</span>
-          </div>
-        } @else if(error$ | async) {
-          <div class="search-result">
-            <span>Error: {{error$}}</span>
-          </div>
-        } @else {
-          @for (option of filteredItems$ | async; track option.id) {
-            <div class="search-result" (click)="onSelectItem(option)">
-              <span>{{option.title}}</span>
-            </div>
-          }
-          @empty {
-            <div class="search-result">
-              <span>No results...</span>
-            </div>
-          }
-        }
+  <div @modalAnimation #searchContainer class="modal-backdrop">
+    <div id="search-container">
+      <div id="search">
+        <mat-icon fontIcon="search"></mat-icon>
+        <input
+          #searchInput
+          id="search"
+          type="text"
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+          placeholder="Search..."
+          autocomplete="off"
+        />
       </div>
-    }
+
+      @if (searchActive()) {
+        <div id="search-results" @searchResultsAnimation>
+          <ng-container *ngIf="filteredItems$ | async as items">
+            <ng-container *ngIf="items.length; else noResults">
+              <cdk-virtual-scroll-viewport
+                *ngIf="shouldUseVirtualScroll(items); else list"
+                #virtualScroll
+                itemSize="50"
+                class="virtual-scroll-viewport"
+              >
+                <div
+                  *cdkVirtualFor="let opt of items; trackBy: trackByItemId"
+                  class="search-result"
+                  (click)="onSelectItem(opt)"
+                >
+                  {{ opt.title }}
+                </div>
+              </cdk-virtual-scroll-viewport>
+
+              <ng-template #list>
+                <div
+                  *ngFor="let opt of items; trackBy: trackByItemId"
+                  class="search-result"
+                  (click)="onSelectItem(opt)"
+                >
+                  {{ opt.title }}
+                </div>
+              </ng-template>
+            </ng-container>
+            <ng-template #noResults>
+              <div class="search-result no-results">No results…</div>
+            </ng-template>
+          </ng-container>
+        </div>
+      }
+    </div>
   </div>
 } @else {
-  <p class="guide">Press control + K to start searching</p>
+  <p class="guide">Press Ctrl+K to start searching</p>
 }

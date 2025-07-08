@@ -1,0 +1,15 @@
+{
+  "SEARCH": {
+    "HISTORY_LABEL": "Search history (latest 10 entries):",
+    "HISTORY_EMPTY": "Search history empty",
+    "PLACEHOLDER": "Search...",
+    "NO_RESULTS": "No results…"
+  },
+  "GUIDE": {
+    "PRESS_SHORTCUT": "Press Ctrl+K to start searching"
+  },
+  "LANG": {
+    "EN": "EN",
+    "ES": "ES"
+  }
+}

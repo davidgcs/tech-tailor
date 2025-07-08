@@ -1,9 +1,12 @@
 @if (searchOpened()) {
   <div @modalAnimation #searchContainer class="modal-backdrop">
     @if (getHistory().length > 0) {
-      <p class="history">Search history (latest 10 entries): {{ getHistory().join(', ') }}</p>
+      <p class="history">
+        {{ 'SEARCH.HISTORY_LABEL' | translate }}
+        {{ getHistory().join(', ') }}
+      </p>
     } @else {
-      <p class="history">Search history empty</p>
+      <p class="history">{{ 'SEARCH.HISTORY_EMPTY' | translate }}</p>
     }
 
     <div id="search-container">
@@ -14,7 +17,7 @@
           type="text"
           [value]="query()"
           (input)="query.set($any($event.target).value)"
-          placeholder="Search..."
+          [placeholder]="'SEARCH.PLACEHOLDER' | translate"
           autocomplete="off"
         />
       </div>
@@ -52,7 +55,7 @@
               }
             } @else {
               <div class="search-result no-results">
-                <span>No results…</span>
+                {{ 'SEARCH.NO_RESULTS' | translate }}
               </div>
             }
           </ng-container>
@@ -61,5 +64,8 @@
     </div>
   </div>
 } @else {
-  <p class="guide">Press Ctrl+K to start searching</p>
+  <p class="guide">{{ 'GUIDE.PRESS_SHORTCUT' | translate }}</p>
 }
+
+<button (click)="changeLanguage('en')">{{ 'LANG.EN' | translate }}</button>
+<button (click)="changeLanguage('es')">{{ 'LANG.ES' | translate }}</button>

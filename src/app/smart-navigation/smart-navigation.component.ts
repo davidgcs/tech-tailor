@@ -28,6 +28,9 @@ import * as NavigationActions from '../store/navigation.actions';
 import * as NavigationSelectors from '../store/navigation.selectors';
 import { gsap } from 'gsap';
 import { Subject, takeUntil } from 'rxjs';
+import { TranslatePipe } from '../shared/translate.pipe';
+import { LanguageService } from '../shared/language.service';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 @Component({
   selector: 'app-smart-navigation',
@@ -40,8 +43,11 @@ import { Subject, takeUntil } from 'rxjs';
     AsyncPipe,
     ScrollingModule,
     CommonModule,
+    TranslatePipe,
+    TranslateModule,
   ],
   animations: smartNavigationAnimations,
+  providers: [LanguageService],
 })
 export class SmartNavigationComponent
   implements OnInit, OnDestroy, AfterViewInit
@@ -50,6 +56,8 @@ export class SmartNavigationComponent
   private readonly navService = inject(SmartNavigationService);
   private readonly intersectionService = inject(IntersectionObserverService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly lang = inject(LanguageService);
+  private readonly translate = inject(TranslateService);
   private readonly destroy$ = new Subject<void>();
 
   @ViewChild('searchContainer', { read: ElementRef })
@@ -215,6 +223,10 @@ export class SmartNavigationComponent
 
   shouldUseVirtualScroll(items: NavigationItem[] | null): boolean {
     return (items?.length || 0) > 100;
+  }
+
+  public changeLanguage(lang: 'en' | 'es'): void {
+    this.translate.use(lang);
   }
 
   ngOnDestroy() {

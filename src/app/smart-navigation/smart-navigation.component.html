@@ -1,0 +1,32 @@
+
+@if (searchOpened()) {
+  @if (history().length > 0) {
+    <p class="history">Search history (latest 10 entries): {{history().join(', ')}}</p>
+  } @else {
+    <p class="history">Search history empty</p>
+  }
+  <div id="search-container">
+    <div id="search">
+      <mat-icon aria-hidden="false" aria-label="search icon" fontIcon="search"></mat-icon>
+      <input type="text" [value]="query()" (input)="query.set($any($event.target).value)" placeholder="Search...">
+    </div>
+    @if(searchActive()){
+      <div id="search-results">
+        @for (option of options(); track option.id) {
+          @if(option.title?.toLowerCase()?.includes(debouncedQuery().toLowerCase())) {
+            <div class="search-result">
+              <span>{{option.title}}</span>
+            </div>
+          }
+        }
+        @empty {
+         <div class="search-result">
+            <span>No results...</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+} @else {
+  <p class="guide">Press control + K to start searching</p>
+}

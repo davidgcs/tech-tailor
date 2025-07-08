@@ -1,7 +1,6 @@
-
 @if (searchOpened()) {
-  @if (history().length > 0) {
-    <p class="history">Search history (latest 10 entries): {{history().join(', ')}}</p>
+  @if (getHistory().length > 0) {
+    <p class="history">Search history (latest 10 entries): {{getHistory().join(', ')}}</p>
   } @else {
     <p class="history">Search history empty</p>
   }
@@ -12,17 +11,25 @@
     </div>
     @if(searchActive()){
       <div id="search-results">
-        @for (option of options(); track option.id) {
-          @if(option.title?.toLowerCase()?.includes(debouncedQuery().toLowerCase())) {
-            <div class="search-result">
+        @if(loading$ | async) {
+          <div class="search-result">
+            <span>Loading...</span>
+          </div>
+        } @else if(error$ | async) {
+          <div class="search-result">
+            <span>Error: {{error$}}</span>
+          </div>
+        } @else {
+          @for (option of filteredItems$ | async; track option.id) {
+            <div class="search-result" (click)="onSelectItem(option)">
               <span>{{option.title}}</span>
             </div>
           }
-        }
-        @empty {
-         <div class="search-result">
-            <span>No results...</span>
-          </div>
+          @empty {
+            <div class="search-result">
+              <span>No results...</span>
+            </div>
+          }
         }
       </div>
     }

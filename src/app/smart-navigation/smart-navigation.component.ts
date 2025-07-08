@@ -4,57 +4,61 @@ import {
   effect,
   HostListener,
   inject,
-  Signal,
+  OnInit,
   signal,
-  WritableSignal,
 } from '@angular/core';
-import { SmartNavigationService } from './smart-navigation.service';
+import { Store } from '@ngrx/store';
 import { MatIconModule } from '@angular/material/icon';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import data from './smart_library_mock_data.json';
+import { SmartNavigationService } from './smart-navigation.service';
 import { NavigationItem } from './navigation.types';
+import * as NavigationActions from '../store/navigation.actions';
+import * as NavigationSelectors from '../store/navigation.selectors';
+import { AsyncPipe } from '@angular/common';
 
 @Component({
   selector: 'app-smart-navigation',
   templateUrl: './smart-navigation.component.html',
   styleUrls: ['./smart-navigation.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatIconModule, MatAutocompleteModule],
+  imports: [MatIconModule, MatAutocompleteModule, AsyncPipe],
 })
-export class SmartNavigationComponent {
+export class SmartNavigationComponent implements OnInit {
+  private readonly store = inject(Store);
   private readonly navService = inject(SmartNavigationService);
 
   query = signal('');
-  debouncedQuery: Signal<string> = this.navService.debouncedSignal(
-    this.query,
-    300
-  );
-  history: WritableSignal<string[]> = signal([]);
+  debouncedQuery = this.navService.debouncedSignal(this.query, 300);
   searchActive = signal(false);
   searchOpened = signal(false);
-  options: WritableSignal<NavigationItem[]> = signal([]);
+
+  filteredItems$ = this.store.select(NavigationSelectors.selectFilteredItems);
+  loading$ = this.store.select(NavigationSelectors.selectLoading);
+  error$ = this.store.select(NavigationSelectors.selectError);
 
   constructor() {
     effect(() => {
-      if (this.debouncedQuery() !== '') {
+      const query = this.debouncedQuery();
+      if (query !== '') {
         this.searchActive.set(true);
-        this.history.update((newValue) => [...newValue, this.debouncedQuery()]);
+        this.store.dispatch(
+          NavigationActions.filterItems({ searchTerm: query })
+        );
+
+        const currentHistory = this.navService.loadHistory();
+        const newHistory = [
+          query,
+          ...currentHistory.filter((h) => h !== query),
+        ].slice(0, 10);
+        this.navService.saveHistory(newHistory);
       } else {
         this.searchActive.set(false);
       }
     });
-    this.options.set(data);
-
-    effect(() => {
-      if (this.history().length > 10) {
-        this.history.set(this.history().slice(-10));
-      }
-      this.navService.saveHistory(this.history());
-    });
   }
 
   ngOnInit() {
-    this.history.set(this.navService.loadHistory());
+    this.store.dispatch(NavigationActions.loadItems());
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -63,5 +67,13 @@ export class SmartNavigationComponent {
       ev.preventDefault();
       this.searchOpened.update((i) => !i);
     }
+  }
+
+  onSelectItem(item: NavigationItem) {
+    this.store.dispatch(NavigationActions.selectItem({ item }));
+  }
+
+  getHistory(): string[] {
+    return this.navService.loadHistory();
   }
 }

@@ -15,16 +15,16 @@ export class VoiceControlComponent implements OnInit {
   isRecording = false;
   isProcessing = false;
   buttonText = 'Iniciar';
-  
+
   constructor(private voiceService: VoiceService) {}
-  
+
   ngOnInit() {
     this.voiceService.status$.subscribe(status => {
       this.isProcessing = status === 'processing';
       this.buttonText = this.isRecording ? 'Detener' : 'Iniciar';
     });
   }
-  
+
   toggleRecording() {
     if (this.isRecording) {
       this.voiceService.stopRecording();
@@ -44,30 +44,30 @@ Preguntas:
 
 1. La nueva sintaxis utilizando el método inject() para inyectar los servicios en la clase es más legible y evita sobrecargar el constructor de múltiples servicios
 
-2. En el ngOnInit se subscribe a un observable pero no hay un ngOnDestroy para cerrar flujo ni un takeUntil de rxjs por ejemplo para evitar que ese observable siga corriendo una vez acabe el ciclo de vida del componente. 
+2. En el ngOnInit se subscribe a un observable pero no hay un ngOnDestroy para cerrar flujo ni un takeUntil de rxjs por ejemplo para evitar que ese observable siga corriendo una vez acabe el ciclo de vida del componente.
 Esto puede causar que si este componente aparece en una página que se cierra y más tarde se vuelva a abrir se acumulen subscripciones al mismo observable pudiendo causar duplicaciónes de ejecución o fallos en el rendimiento.
 Una alternativa sería utilizar directamente los valores del estado en el html usando la pipe "async" de manera que liberamos de carga al componente y el html se encarga automáticamente de actualizar los datos del estado.
 
 3. Comprobaciones con strings concretos en mitad de la ejecución. this.isProcessing = status === 'processing'; Aunque funciona no es la mejor práctica y lo ideal sería tener un enumerado o un objeto de claves recogido en una variable
 para tener localizadas las claves de comprobaciones en un mismo punto y tener el codigo mejor organizado y estructurado, haciendo que sea más facil de escalar y encontrando posibles errores de manera más eficiente.
 
-4. Ligado al punto anterior, no hay prácticamente ningún tipado en ninguno de los parámetros, variables o retornos de función, lo que desaprovecha totalmente las capacidades de TypeScript y deja la puerta abierta a errores 
+4. Ligado al punto anterior, no hay prácticamente ningún tipado en ninguno de los parámetros, variables o retornos de función, lo que desaprovecha totalmente las capacidades de TypeScript y deja la puerta abierta a errores
 a la hora de realizar asignaciones o mapeos. Es aconsejable activar eslint para que resalte como si fuera un error cuando se usa el tipo implícito any para obligar en cierta medida al desarrollador a que utilice buenas prácticas.
 
 5. Al igual que en el punto 3, this.isRecording ? 'Detener' : 'Iniciar'; se está asignando un texto final a mostrar en la aplicación en un botón directamente desde el código directamente. Imaginemos que en el futuro se quiere implementar
-múltiples idiomas en la aplicación, todo el código que aplique directamente cadenas de texto en un idoma tendrían que modificarse lo cual no es tarea sencilla si tenemos cadenas de texto esparcidas por todo el código. Teniendo un enumerado 
+múltiples idiomas en la aplicación, todo el código que aplique directamente cadenas de texto en un idoma tendrían que modificarse lo cual no es tarea sencilla si tenemos cadenas de texto esparcidas por todo el código. Teniendo un enumerado
 al principio de la clase agrupamos todos los posibles textos para en un futuro implementar ngx-translate por ejemplo y sería tan simple como mover el objeto del enumerado a un json en lugar de múltiples modificaciones por todo el código.
 
 6. A nivel personal no me gusta la idea de mezclar la lógica del componente con el html directamente y prefiero llevar el html a un fichero a parte. Uno de consejos para realizar buenas prácticas es mantener las clases y funciones lo más simples posibles,
-eso implica que cada función realice una única función a ser posible y por supuesto dividir el código en distintos ficheros en funcion de su labor creo que es cuanto menos acertado. 
+eso implica que cada función realice una única función a ser posible y por supuesto dividir el código en distintos ficheros en funcion de su labor creo que es cuanto menos acertado.
 
 7. El texto del botón se actualiza constantemente cuando cambia el estado, quizás esta no es la forma más eficiente ya que solo debería cambiar cuando "this.isRecording" sea distinto, sino estaríamos sobreescribiendo todo el rato el texto del botón
-por el mismo valor. Quizás en este punto no afecte al rendimiento pero si esto se desarrolla con el tiempo y se siguen usando esas prácticas a la larga puede traer problemas de rendimiento. El estado debería manejarse en un servicio  
+por el mismo valor. Quizás en este punto no afecte al rendimiento pero si esto se desarrolla con el tiempo y se siguen usando esas prácticas a la larga puede traer problemas de rendimiento. El estado debería manejarse en un servicio
 
 8. La acción del html ocurre en un div padre en lugar del botón. Aunque esto es una práctica común no es lo ideal ya que tenemos un bloque estructural (div) que realiza una acción y un elemento clickable que carece de esta. Esto genera problemas
-de accesibilidad, además faltarían atributos descriptivos como "aria-label" para dar información a los dispositivos de accesibilidad como puede ser el voiceOver del dispositivo móvil 
+de accesibilidad, además faltarían atributos descriptivos como "aria-label" para dar información a los dispositivos de accesibilidad como puede ser el voiceOver del dispositivo móvil
 
 9. Aunque este componente no tiene una lógica muy extensa ni @Inputs se podría valorar el uso de ChangeDetectionStrategy.OnPush ya que esto minimiza la detección de cambios de angular agilizando la recarga de datos ya que solo se actualizan
 en este caso el click del botón pero en otros componentes más complejos si podría implicar una mejora significativa
 
-Se puede ver una propuesta de mejora del componente en src/app/voice-control
+Se puede ver una propuesta de mejora del componente en "./exercise 1.ts"
